@@ -15,7 +15,7 @@ let analyser;
 let bufferLength;
 let dataArray;
 
-let pithHistory = new Uint8Array(128);
+let pithHistory = new Uint8Array(256);
 let pithPointer = 0;
 
 let playing = false;
@@ -24,6 +24,9 @@ main();
 update();
 
 async function main() {
+  graphics.width = graphics.clientWidth;
+  graphics.height = graphics.clientHeight;
+
   mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   listAudioDevices();
 
@@ -34,6 +37,7 @@ async function main() {
 
 function connect() {
   audioContext = new AudioContext();
+  console.log(audioContext.sampleRate);
 
   source = audioContext.createMediaStreamSource(mediaStream);
   destination = audioContext.destination;
@@ -60,6 +64,8 @@ function disconnect() {
 function initAnalizer() {
   analyser = audioContext.createAnalyser();
   analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.7;
+  
   bufferLength = analyser.frequencyBinCount;
   dataArray = new Uint8Array(bufferLength);
 }
@@ -99,7 +105,7 @@ audioDelayInput.addEventListener('input', () => {
   connect();
 });
 
-graphics.addEventListener('resize', () => {
+addEventListener('resize', () => {
   graphics.width = graphics.clientWidth;
   graphics.height = graphics.clientHeight;
 });
@@ -125,6 +131,7 @@ function update() {
   requestAnimationFrame(update);
 
   if (!playing) return;
+  analyser.getByteFrequencyData(dataArray);
 
   // Data
   const pitch = detectPitch(dataArray, audioContext.sampleRate);
@@ -135,25 +142,61 @@ function update() {
   pithPointer++;
   if (pithPointer > pithHistory.length) pithPointer -= pithHistory.length;
 
-  drawGraph(formants, resonances);
+  drawGraph(pitch, formants, resonances);
 }
 
-function drawGraph(formants, resonances) {
-  analyser.getByteFrequencyData(dataArray);
-
+function drawGraph(f0, formants, resonances) {
   canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
   const xScale = canvas.width / 2048;
-  const yScale = canvas.height / 256;
+  const yScale = canvas.height / 300;
 
-  console.log(audioContext.sampleRate);
+  // Graph metrics
+
+  canvasCtx.fillStyle = 'pink';
+  canvasCtx.fillRect(
+    0,
+    canvas.height - 255 * yScale,
+    canvas.width,
+    (canvas.height - 180 * yScale) - (canvas.height - 255 * yScale)
+  );
+
+  canvasCtx.fillStyle = 'lightblue';
+  canvasCtx.fillRect(
+    0,
+    canvas.height - 165 * yScale,
+    canvas.width,
+    (canvas.height - 85 * yScale) - (canvas.height - 165 * yScale)
+  );
+
+  canvasCtx.fillStyle = 'whitesmoke';
+  canvasCtx.fillRect(
+    0,
+    canvas.height - 180 * yScale,
+    canvas.width,
+    (canvas.height - 165 * yScale) - (canvas.height - 180 * yScale)
+  );
+
+  canvasCtx.font = "12px serif";
+  canvasCtx.lineWidth = 1;
+  canvasCtx.fillStyle = 'gray';
+  canvasCtx.strokeStyle = 'gray';
+
+  for (var y = 0; y < 300; y += 10) {
+    let py = canvas.height - ((y+1) * yScale);
+    canvasCtx.fillText(y + "Hz", 5, py);
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(50, py);
+    canvasCtx.lineTo(canvas.width, py);
+    canvasCtx.stroke();
+  }
 
   // Ressonance
   canvasCtx.fillStyle = 'blue';
   resonances.forEach(({ frequency, amplitude }) => {
     const x = frequency * xScale;
     const y = canvas.height - amplitude * yScale;
-    canvasCtx.fillRect(x - 2, y - 2, 4, 4);
+    canvasCtx.fillRect(x - 4, y - 4, 8, 8);
   });
 
   // Formants
@@ -162,12 +205,11 @@ function drawGraph(formants, resonances) {
     const x = frequency * xScale;
     const y = canvas.height / 2;
     canvasCtx.beginPath();
-    canvasCtx.arc(x, y, 3, 0, Math.PI * 2);
+    canvasCtx.arc(x, y, 6, 0, Math.PI * 2);
     canvasCtx.fill();
   });
 
   // Pitch
-    
   canvasCtx.strokeStyle = 'green';
   canvasCtx.beginPath();
 
@@ -177,20 +219,47 @@ function drawGraph(formants, resonances) {
   let i = pithPointer+1;
   if (i > pithHistory.length) i -= pithHistory.length;
 
-  canvasCtx.moveTo(0, canvas.height - pithHistory[i] * xScale);
-  while (true) {
+  let lastWas0 = true;
 
+  while (true) {
     const y = canvas.height - pithHistory[i] * yScale;
 
-    canvasCtx.lineTo(x, y);
+    if (pithHistory[i] == 0)
+      lastWas0 = true;
+
+    else if (lastWas0 && pithHistory[i] != 0)
+    {
+      lastWas0 = false;
+      canvasCtx.moveTo(x, y);
+    }
+    else
+      canvasCtx.lineTo(x, y);
 
     i++;
     x += xstep;
     if (i > pithHistory.length) i -= pithHistory.length;
     if (i == pithPointer) break;
   }
-
+  canvasCtx.lineWidth = 4;
   canvasCtx.stroke();
+
+  let g;
+
+  if (f0 < 85 || f0 > 300)
+    g = "-";
+  else if (f0 < 165)
+    g = "Male";
+  else
+    g = "Female";
+
+    if (g == "-") {
+      if (formants[0] < 500 && formants[1] > 1500) g = "Neutral Male";
+      if (formants[0] > 500 && formants[1] < 1500) g = "Neutral Female";
+    }
+
+  canvasCtx.font = "24px serif";
+  canvasCtx.fillStyle = 'black';
+  canvasCtx.fillText("gender: " + g, 500, 20);
 }
 
 function detectPitch(frequencyData, sampleRate) {
