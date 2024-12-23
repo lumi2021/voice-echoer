@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Echoer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="controls">
+        <button id="start">Iniciar</button>
+        <button id="stop" disabled>Parar</button>
+
+        <select id="audioInput"></select>
+
+        <input id="audioDelay" type="range" min="0" max="10" step="0.5" value="3">
+    </div>
+
+    <canvas id="graphics"></canvas>
+
+    <div id="graph-options">
+        
+    </div>
+
+    <script type="text/javascript" src="script.js"></script>
+</body>
+</html>
