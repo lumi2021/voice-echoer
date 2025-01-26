@@ -167,7 +167,7 @@ async function requestMedia() {
     mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
             deviceId: deviceId ? { exact: deviceId } : undefined,
-            sampleRate: 88200,
+            sampleRate: 44100,
             channelCount: 1,
             echoCancellation: false,
             noiseSuppression: false,
