@@ -22,6 +22,6 @@ body {
 
 #graphics {
     width: 100%;
-    height: calc(100% - 70px);
+    height: calc(100vh - 70px);
     image-rendering: pixelated;
 }
